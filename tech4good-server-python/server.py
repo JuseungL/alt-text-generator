@@ -2,6 +2,12 @@ from flask import Flask, request, jsonify
 from flask_cors import CORS
 from openai import OpenAI 
 import os
+import requests
+from selenium import webdriver
+from selenium.webdriver.chrome.service import Service
+from selenium.webdriver.chrome.options import Options
+from webdriver_manager.chrome import ChromeDriverManager
+from bs4 import BeautifulSoup # 크롤링
 
 app = Flask(__name__)
 CORS(app)  # CORS 설정 추가
@@ -53,6 +59,66 @@ def generate_alt_text():
 
     except OpenAI.error.OpenAIError as e:
         return jsonify({'error': 'Failed to generate alt text', 'details': str(e)}), 500
+    
+
+def get_html_content(url):
+    try:
+        # Selenium 설정
+        chrome_options = Options()
+        chrome_options.add_argument("--headless")  # 브라우저 창을 열지 않음
+        driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=chrome_options)
+        
+        driver.get(url)
+        html_content = driver.page_source
+        
+        driver.quit()
+        return html_content
+    except Exception as e:
+        print(f"Error fetching HTML content: {e}")
+        return None
+
+@app.route('/summarize-html', methods=['POST'])
+def summarize_html():
+    data = request.json
+    url = data.get('url')
+
+    if not url:
+        return jsonify({'error': 'URL is required'}), 400
+
+    try:
+        # URL로부터 HTML 콘텐츠 가져오기
+        html_content = get_html_content(url)
+        if html_content is None:
+            return jsonify({'error': 'Failed to retrieve HTML content'}), 500
+    
+        # HTML 파싱
+        soup = BeautifulSoup(html_content, 'html.parser')
+        head_text = soup.head.get_text(separator=' ', strip=True) if soup.head else ""
+        body_text = soup.body.get_text(separator=' ', strip=True) if soup.body else ""
+        # 요약할 텍스트 준비
+        full_text = f"Head: {head_text}\nBody: {body_text}"
+        
+        # OpenAI API를 사용해 요약 생성
+        client = OpenAI(api_key=os.environ.get('OPENAI_API_KEY'))
+        response = client.chat.completions.create(
+            model=MODEL,
+            messages=[
+                {"role": "system", "content": "Summarize the following HTML content into 2~3 concise sentences. 이때 한국어로 반환해줘."},
+                {"role": "user", "content": full_text}
+            ],
+            temperature=0.7,
+        )
+        summary = response.choices[0].message.content.strip()
+    
+        return jsonify({'summary': summary})
+
+    except OpenAI.error.OpenAIError as e:
+        return jsonify({'error': 'Failed to summarize HTML', 'details': str(e)}), 500
+    except Exception as e:
+        # 포괄적인 에러 핸들링
+        print(f"Unexpected error: {e}")
+        return jsonify({'error': 'An unexpected error occurred', 'details': str(e)}), 500
+
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=3000)
