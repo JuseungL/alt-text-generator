@@ -66,6 +66,10 @@ def get_html_content(url):
         # Selenium 설정
         chrome_options = Options()
         chrome_options.add_argument("--headless")  # 브라우저 창을 열지 않음
+        chrome_options.add_argument("--no-sandbox")
+        chrome_options.add_argument("--disable-gpu")
+        chrome_options.add_argument("--disable-dev-shm-usage")  # 메모리 관련 오류를 줄이기 위해
+        chrome_options.add_argument("user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36")
         driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=chrome_options)
         
         driver.get(url)
@@ -103,7 +107,11 @@ def summarize_html():
         response = client.chat.completions.create(
             model=MODEL,
             messages=[
-                {"role": "system", "content": "Summarize the following HTML content into 2~3 concise sentences. 이때 한국어로 반환해줘."},
+                {"role": "system", "content": """
+                                                INPUT으로 들어온 텍스트(웹페이지에 대한 전체적인 내용)를 2문장으로 핵심만 담아 반환해줘. 
+                                                '시각장애인을 위한 음성 안내 기능도 제공됩니다.'라는 말은 포함시키지말고 딱 해당 웹페이지에 대한 요약만 해줬으면 좋겠어.
+                                                이때 한국어로 반환해줘.
+                                              """},
                 {"role": "user", "content": full_text}
             ],
             temperature=0.7,
@@ -121,4 +129,4 @@ def summarize_html():
 
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=3000)
+    app.run(host='0.0.0.0', port=5000)

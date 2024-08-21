@@ -3,7 +3,7 @@ let hoverTimeout;
 // 이미지의 대체 텍스트를 생성하는 함수
 async function generateAltText(image) {
   try {
-    const response = await fetch('http://localhost:3000/generate-alt-text', {
+    const response = await fetch('https://www.drinkguide.store/generate-alt-text', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
